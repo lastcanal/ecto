@@ -48,6 +48,7 @@ defmodule Ecto.Changeset.HasAssocTest do
       has_many :nilify_posts, Post, on_replace: :nilify,
         defaults: {__MODULE__, :send_to_self, [:extra]}
       has_many :invalid_posts, Post, on_replace: :mark_as_invalid
+      has_many :ignore_posts, Post, on_replace: :ignore
       has_one :profile, {"users_profiles", Profile},
         defaults: [name: "default"], on_replace: :delete
       has_one :raise_profile, Profile, on_replace: :raise
@@ -632,6 +633,21 @@ defmodule Ecto.Changeset.HasAssocTest do
     assert changeset.changes == %{}
     assert changeset.errors == [invalid_posts: {"is invalid", [validation: :assoc, type: {:array, :map}]}]
     refute changeset.valid?
+  end
+
+  test "cast has_many with on_replace: :ignore" do
+    schema = %Author{ignore_posts: [%Post{id: 1}]}
+
+    changeset = cast(schema, %{"ignore_posts" => []}, :ignore_posts)
+    assert [%{valid?: true}] = changeset.changes[:ignore_posts]
+    assert changeset.errors == []
+    assert changeset.valid?
+
+    changeset = cast(schema, %{"ignore_posts" => [%{title: "Title"}]}, :ignore_posts)
+    assert [%{valid?: true}, %{valid?: true, action: :insert}] = changeset.changes[:ignore_posts]
+
+    assert changeset.errors == []
+    assert changeset.valid?
   end
 
   test "cast has_many twice" do

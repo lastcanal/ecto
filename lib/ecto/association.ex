@@ -736,6 +736,7 @@ defmodule Ecto.Association.Has do
   @on_delete_opts [:nothing, :nilify_all, :delete_all]
   @on_replace_opts [:raise, :mark_as_invalid, :delete, :delete_if_exists, :nilify]
   @has_one_on_replace_opts @on_replace_opts ++ [:update]
+  @has_many_on_replace_opts @on_replace_opts ++ [:ignore]
   defstruct [
     :cardinality,
     :field,
@@ -808,13 +809,13 @@ defmodule Ecto.Association.Has do
     end
 
     on_replace = Keyword.get(opts, :on_replace, :raise)
-    on_replace_opts = if cardinality == :one, do: @has_one_on_replace_opts, else: @on_replace_opts
+    on_replace_opts = if cardinality == :one, do: @has_one_on_replace_opts, else: @has_many_on_replace_opts
 
     unless on_replace in on_replace_opts do
       raise ArgumentError,
             "invalid `:on_replace` option for #{inspect(name)}. " <>
               "The only valid options are: " <>
-              Enum.map_join(@on_replace_opts, ", ", &"`#{inspect(&1)}`")
+              Enum.map_join(on_replace_opts, ", ", &"`#{inspect(&1)}`")
     end
 
     defaults = Ecto.Association.validate_defaults!(module, name, opts[:defaults] || [])
@@ -910,6 +911,7 @@ defmodule Ecto.Association.Has do
         :nilify -> %{changeset | action: :update}
         :update -> %{changeset | action: :update}
         :delete -> %{changeset | action: :delete}
+        :ignore -> %{changeset | action: :ignore}
       end
 
     changeset = Ecto.Association.update_parent_prefix(changeset, parent)
@@ -918,6 +920,10 @@ defmodule Ecto.Association.Has do
       {:ok, _} -> {:ok, nil}
       {:error, changeset} -> {:error, changeset}
     end
+  end
+
+  def on_repo_change(_assoc, _parent, %{action: :ignore} = changeset, _adapter, _opts) do
+    {:ok, changeset}
   end
 
   def on_repo_change(assoc, parent_changeset, changeset, _adapter, opts) do
